@@ -338,7 +338,7 @@ public class JavaApp extends Process {
     }
     
     /**
-     * get the pid of the current process.
+     * Get the pid of the current process.
      * 
      * @return pid.
      */
