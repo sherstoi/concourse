@@ -336,6 +336,15 @@ public class JavaApp extends Process {
             }
         }
     }
+    
+    /**
+     * get the pid of the current process.
+     * 
+     * @return pid.
+     */
+    public String getPid() {
+       return Processes.getCurrentPid();
+    }
 
     @Override
     public void destroy() {
