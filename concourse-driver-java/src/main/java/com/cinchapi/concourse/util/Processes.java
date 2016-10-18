@@ -178,7 +178,7 @@ public final class Processes {
      * @param stream
      * @return the lines in the stream
      */
-    private static List<String> readStream(InputStream stream) {
+    public static List<String> readStream(InputStream stream) {
         try {
             BufferedReader out = new BufferedReader(
                     new InputStreamReader(stream));

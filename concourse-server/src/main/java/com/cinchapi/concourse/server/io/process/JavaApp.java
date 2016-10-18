@@ -49,7 +49,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
-import com.google.common.io.BaseEncoding;
 import com.google.common.io.Files;
 
 /**
@@ -521,4 +520,42 @@ public class JavaApp extends Process {
         return process.waitFor();
     }
 
+    /**
+     * <p>
+     * Runs the process status command and gets the pid of the process that
+     * holds the input appToken.
+     * </p>
+     * Currently this functionality will be supported only by Linux,Mac and
+     * Solaris platform.
+     * 
+     * @param appToken
+     * @return pid of the plugin
+     */
+    public String getPid(String appToken) {
+        Process process = null;
+        try {
+            if(Platform.isLinux() || Platform.isMacOsX()
+                    || Platform.isSolaris()) {
+                ProcessBuilder pb = Processes.getBuilderWithPipeSupport(
+                        "ps aux | grep " + appToken + " | grep -v \"grep "
+                                + appToken + "\" | awk '{print $2}' ");
+                process = pb.start();
+            }
+            else {
+                throw new UnsupportedOperationException(
+                        "Cannot get plugin information from the underlying platform");
+            }
+        }
+        catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        if(process != null) {
+            Processes.waitForSuccessfulCompletion(process);
+            List<String> lines = Processes.readStream(process.getInputStream());
+            for (String line : lines) {
+                return line;
+            }
+        }
+        return null;
+    }
 }
