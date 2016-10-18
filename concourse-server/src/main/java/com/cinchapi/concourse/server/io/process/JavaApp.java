@@ -20,9 +20,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -38,13 +40,16 @@ import com.cinchapi.common.process.ProcessTerminationListener;
 import com.cinchapi.common.process.ProcessWatcher;
 import com.cinchapi.concourse.server.io.FileSystem;
 import com.cinchapi.concourse.util.Logger;
+import com.cinchapi.concourse.util.ByteBuffers;
 import com.cinchapi.concourse.util.Platform;
 import com.cinchapi.concourse.util.Processes;
+import com.cinchapi.concourse.util.Random;
 import com.cinchapi.concourse.util.TLists;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.io.BaseEncoding;
 import com.google.common.io.Files;
 
 /**
@@ -147,6 +152,21 @@ public class JavaApp extends Process {
                 .getCodeSource().getLocation().getPath());
         return classpath += CLASSPATH_SEPARATOR + f.getAbsolutePath();
     }
+
+    /**
+     * A randomly chosen username for JavaApp. The randomly generated name is
+     * chosen so that it is impossible for it to conflict with an actual
+     * username, based on the rules that govern valid usernames (e.g. usernames
+     * cannot contain spaces)
+     */
+    private static final String APP_USERNAME = Random.getSimpleString() + " "
+            + Random.getSimpleString();
+
+    /**
+     * The name of the dynamic property that is passed to the plugin's JVM to
+     * distinguish the particular JavaApp from others.
+     */
+    public final static String APP_TOKEN_JVM_PROPERTY = "com.cinchapi.concourse.server.io.process.JavaApp.token";
 
     /**
      * Make sure that the {@code source} has all the necessary components and
@@ -254,18 +274,6 @@ public class JavaApp extends Process {
      * @param source
      * @param options
      */
-    public JavaApp(String classpath, String source, ArrayList<String> options) {
-        this(classpath, source,
-                (String[]) options.toArray(new String[options.size()]));
-    }
-
-    /**
-     * Construct a new instance.
-     *
-     * @param classpath
-     * @param source
-     * @param options
-     */
     public JavaApp(String classpath, String source, String... options) {
         source = injectHostWatcherCode(source);
         classpath = injectHostWatcherJarsOntoClasspath(classpath);
@@ -292,6 +300,37 @@ public class JavaApp extends Process {
         }));
         Logger.debug("Attemping to create a new JavaApp with classpath {} and "
                 + "generated source {}", classpath, source);
+    }
+
+    /**
+     * Return a new JavaApp token.
+     * 
+     * <p>
+     * A JavaApp token is a token that is not associated with an
+     * actual user, but is instead generated based on the
+     * {@link #APP_USERNAME}.
+     * </p>
+     * <p>
+     * Service tokens do not expire!
+     * </p>
+     * 
+     * @return the new service token
+     */
+    public static ByteBuffer getNewJavaAppToken() {
+        ByteBuffer bytes = ByteBuffers.fromString(APP_USERNAME);
+        return bytes;
+    }
+
+    /**
+     * Construct a new instance.
+     *
+     * @param classpath
+     * @param source
+     * @param options
+     */
+    public JavaApp(String classpath, String source, ArrayList<String> options) {
+        this(classpath, source,
+                (String[]) options.toArray(new String[options.size()]));
     }
 
     /**
@@ -336,14 +375,14 @@ public class JavaApp extends Process {
             }
         }
     }
-    
+
     /**
-     * Get the pid of the current process.
+     * Get the pid of the {@link Plugin} started by this JavaApp.
      * 
      * @return pid.
      */
-    public String getPid() {
-       return Processes.getCurrentPid();
+    public String getPluginInfo(UUID appToken) {
+        return Processes.getPluginInfo(appToken);
     }
 
     @Override

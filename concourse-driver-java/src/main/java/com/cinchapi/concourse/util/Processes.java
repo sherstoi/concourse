@@ -22,6 +22,7 @@ import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.cinchapi.concourse.annotate.UtilityClass;
 import com.google.common.base.Throwables;
@@ -193,5 +194,44 @@ public final class Processes {
         }
     }
 
-    private Processes() {} /* no-op */
+    private Processes() {} /* noinit */
+
+    /**
+     * <p>
+     * Runs the process status command and gets the pid of the process that
+     * holds the input appToken.
+     * </p>
+     * Currently this functionality will be supported only by Linux,Mac and
+     * Solaris platform.
+     * 
+     * @param appToken {@UUID}
+     * @return pid of the plugin
+     */
+    public static String getPluginInfo(UUID appToken) {
+        Process process = null;
+        try {
+            if(Platform.isLinux() || Platform.isMacOsX()
+                    || Platform.isSolaris()) {
+                ProcessBuilder pb = getBuilderWithPipeSupport(
+                        "ps aux | grep " + appToken + " | grep -v \"grep "
+                                + appToken.toString() + "\" | awk '{print $2}' ");
+                process = pb.start();
+            }
+            else {
+                throw new UnsupportedOperationException(
+                        "Cannot get plugin information from the underlying platform");
+            }
+        }
+        catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        if(process != null) {
+            waitForSuccessfulCompletion(process);
+            List<String> lines = readStream(process.getInputStream());
+            for (String line : lines) {
+                return line;
+            }
+        }
+        return null;
+    }
 }
