@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -733,8 +734,8 @@ public class PluginManager {
                     "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address="
                             + config.getRemoteDebuggerPort());
         }
-        String appToken = BaseEncoding.base32Hex()
-                .encode(JavaApp.getNewJavaAppToken().array());
+        UUID appToken = UUID
+                .nameUUIDFromBytes(JavaApp.getNewJavaAppToken().array());
         options.add("-Xms" + heapSize + "M");
         options.add("-Xmx" + heapSize + "M");
         options.add("-D" + Plugin.PLUGIN_HOME_JVM_PROPERTY + "=" + pluginHome);
@@ -781,7 +782,7 @@ public class PluginManager {
         registry.put(id, RegistryData.FROM_PLUGIN_RESPONSES,
                 Maps.<AccessToken, RemoteMethodResponse> newConcurrentMap());
         String pluginPid = app.getPid(appToken);
-        if( pluginPid!= null)
+        if(pluginPid != null)
             activePlugins.add(pluginPid + " " + id);
     }
 

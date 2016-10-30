@@ -523,15 +523,15 @@ public class JavaApp extends Process {
     /**
      * <p>
      * Runs the process status command and gets the pid of the process that
-     * holds the input appToken.
+     * holds the input {@link UUID} appToken.
      * </p>
      * Currently this functionality will be supported only by Linux,Mac and
      * Solaris platform.
      * 
-     * @param appToken
+     * @param appToken UUID
      * @return pid of the plugin
      */
-    public String getPid(String appToken) {
+    public String getPid(UUID appToken) {
         Process process = null;
         try {
             if(Platform.isLinux() || Platform.isMacOsX()
