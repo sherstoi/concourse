@@ -22,7 +22,6 @@ import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import com.cinchapi.concourse.annotate.UtilityClass;
 import com.google.common.base.Throwables;
@@ -204,17 +203,17 @@ public final class Processes {
      * Currently this functionality will be supported only by Linux,Mac and
      * Solaris platform.
      * 
-     * @param appToken {@UUID}
+     * @param appToken
      * @return pid of the plugin
      */
-    public static String getPluginInfo(UUID appToken) {
+    public static String getPluginInfo(String appToken) {
         Process process = null;
         try {
             if(Platform.isLinux() || Platform.isMacOsX()
                     || Platform.isSolaris()) {
                 ProcessBuilder pb = getBuilderWithPipeSupport(
                         "ps aux | grep " + appToken + " | grep -v \"grep "
-                                + appToken.toString() + "\" | awk '{print $2}' ");
+                                + appToken + "\" | awk '{print $2}' ");
                 process = pb.start();
             }
             else {

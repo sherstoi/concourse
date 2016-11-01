@@ -33,7 +33,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -734,15 +733,13 @@ public class PluginManager {
                     "-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address="
                             + config.getRemoteDebuggerPort());
         }
-        UUID appToken = UUID
-                .nameUUIDFromBytes(JavaApp.getNewJavaAppToken().array());
+        String appToken = JavaApp.getNewJavaAppToken();
         options.add("-Xms" + heapSize + "M");
         options.add("-Xmx" + heapSize + "M");
         options.add("-D" + Plugin.PLUGIN_HOME_JVM_PROPERTY + "=" + pluginHome);
         options.add("-D" + Plugin.PLUGIN_SERVICE_TOKEN_JVM_PROPERTY + "="
                 + serviceToken);
-        options.add("-D" + JavaApp.APP_TOKEN_JVM_PROPERTY + "="
-                + appToken.toString());
+        options.add("-D" + JavaApp.APP_TOKEN_JVM_PROPERTY + "="+ appToken);
         String cp = StringUtils.join(classpath, JavaApp.CLASSPATH_SEPARATOR);
         JavaApp app = new JavaApp(cp, source, options);
         app.run();

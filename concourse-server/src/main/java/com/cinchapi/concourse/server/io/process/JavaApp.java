@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,10 +39,8 @@ import com.cinchapi.common.process.ProcessTerminationListener;
 import com.cinchapi.common.process.ProcessWatcher;
 import com.cinchapi.concourse.server.io.FileSystem;
 import com.cinchapi.concourse.util.Logger;
-import com.cinchapi.concourse.util.ByteBuffers;
 import com.cinchapi.concourse.util.Platform;
 import com.cinchapi.concourse.util.Processes;
-import com.cinchapi.concourse.util.Random;
 import com.cinchapi.concourse.util.TLists;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -151,15 +148,6 @@ public class JavaApp extends Process {
                 .getCodeSource().getLocation().getPath());
         return classpath += CLASSPATH_SEPARATOR + f.getAbsolutePath();
     }
-
-    /**
-     * A randomly chosen username for JavaApp. The randomly generated name is
-     * chosen so that it is impossible for it to conflict with an actual
-     * username, based on the rules that govern valid usernames (e.g. usernames
-     * cannot contain spaces)
-     */
-    private static final String APP_USERNAME = Random.getSimpleString() + " "
-            + Random.getSimpleString();
 
     /**
      * The name of the dynamic property that is passed to the plugin's JVM to
@@ -313,11 +301,10 @@ public class JavaApp extends Process {
      * Service tokens do not expire!
      * </p>
      * 
-     * @return the new service token
+     * @return the new {@link UUID} service token
      */
-    public static ByteBuffer getNewJavaAppToken() {
-        ByteBuffer bytes = ByteBuffers.fromString(APP_USERNAME);
-        return bytes;
+    public static String getNewJavaAppToken() {
+        return UUID.randomUUID().toString();
     }
 
     /**
@@ -380,7 +367,7 @@ public class JavaApp extends Process {
      * 
      * @return pid.
      */
-    public String getPluginInfo(UUID appToken) {
+    public String getPluginInfo(String appToken) {
         return Processes.getPluginInfo(appToken);
     }
 
@@ -531,7 +518,7 @@ public class JavaApp extends Process {
      * @param appToken UUID
      * @return pid of the plugin
      */
-    public String getPid(UUID appToken) {
+    public String getPid(String appToken) {
         Process process = null;
         try {
             if(Platform.isLinux() || Platform.isMacOsX()
