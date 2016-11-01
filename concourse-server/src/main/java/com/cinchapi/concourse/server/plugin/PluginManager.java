@@ -741,7 +741,8 @@ public class PluginManager {
         options.add("-D" + Plugin.PLUGIN_HOME_JVM_PROPERTY + "=" + pluginHome);
         options.add("-D" + Plugin.PLUGIN_SERVICE_TOKEN_JVM_PROPERTY + "="
                 + serviceToken);
-        options.add("-D" + JavaApp.APP_TOKEN_JVM_PROPERTY + "=" + appToken);
+        options.add("-D" + JavaApp.APP_TOKEN_JVM_PROPERTY + "="
+                + appToken.toString());
         String cp = StringUtils.join(classpath, JavaApp.CLASSPATH_SEPARATOR);
         JavaApp app = new JavaApp(cp, source, options);
         app.run();
