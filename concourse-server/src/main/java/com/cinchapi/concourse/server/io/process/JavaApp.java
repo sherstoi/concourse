@@ -64,13 +64,9 @@ public class JavaApp extends Process {
      */
     private static String getHostWatcherCodeInjectionMainBlock() {
         // @formatter:off
-        return ""
-        + "      try {\n"
-        + "        watchThreadStarted.await();\n"
-        + "      }\n"
-        + "      catch(InterruptedException e) {\n"
-        + "        throw new RuntimeException(e);\n"
-        + "      }\n";
+        return "" + "      try {\n" + "        watchThreadStarted.await();\n"
+                + "      }\n" + "      catch(InterruptedException e) {\n"
+                + "        throw new RuntimeException(e);\n" + "      }\n";
         // @formatter:on
     }
 
@@ -85,31 +81,23 @@ public class JavaApp extends Process {
     private static String getHostWatcherCodeInjectionStaticBlock(String pid) {
         // @formatter:off
         return ""
-        + "static java.util.concurrent.CountDownLatch watchThreadStarted = new java.util.concurrent.CountDownLatch(1);\n"
-        + "static {\n"
-        + "  Thread main = Thread.currentThread();"
-        + "  Thread t = new Thread(new Runnable() {\n"
-        + "    @Override\n"
-        + "    public void run() {\n"
-        + "      "+ProcessWatcher.class.getName()+" watcher = new "+ProcessWatcher.class.getName()+"();\n"
-        + "      java.util.concurrent.atomic.AtomicBoolean terminated = new java.util.concurrent.atomic.AtomicBoolean(false);\n"
-        + "      watcher.watch(\""+pid+"\", new "+ProcessTerminationListener.class.getName()+"() {\n"
-        + "        @Override\n"
-        + "        public void onTermination() {\n"
-        + "          terminated.set(true);\n"
-        + "        }\n"
-        + "      });\n"
-        + "        watchThreadStarted.countDown();\n"
-        + "        while(!terminated.get() && main.isAlive()) {\n"
-        + "          Thread.yield();\n"
-        + "          continue;\n"
-        + "        }"
-        + "      System.exit(0);\n"
-        + "    }\n"
-        + "  });\n"
-        + "  t.setDaemon(true);\n"
-        + "  t.start();\n"
-        + "}";
+                + "static java.util.concurrent.CountDownLatch watchThreadStarted = new java.util.concurrent.CountDownLatch(1);\n"
+                + "static {\n" + "  Thread main = Thread.currentThread();"
+                + "  Thread t = new Thread(new Runnable() {\n"
+                + "    @Override\n" + "    public void run() {\n" + "      "
+                + ProcessWatcher.class.getName() + " watcher = new "
+                + ProcessWatcher.class.getName() + "();\n"
+                + "      java.util.concurrent.atomic.AtomicBoolean terminated = new java.util.concurrent.atomic.AtomicBoolean(false);\n"
+                + "      watcher.watch(\"" + pid + "\", new "
+                + ProcessTerminationListener.class.getName() + "() {\n"
+                + "        @Override\n"
+                + "        public void onTermination() {\n"
+                + "          terminated.set(true);\n" + "        }\n"
+                + "      });\n" + "        watchThreadStarted.countDown();\n"
+                + "        while(!terminated.get() && main.isAlive()) {\n"
+                + "          Thread.yield();\n" + "          continue;\n"
+                + "        }" + "      System.exit(0);\n" + "    }\n"
+                + "  });\n" + "  t.setDaemon(true);\n" + "  t.start();\n" + "}";
         // @formatter:on
     }
 
@@ -294,8 +282,7 @@ public class JavaApp extends Process {
      * 
      * <p>
      * A JavaApp token is a token that is not associated with an
-     * actual user, but is instead generated based on the
-     * {@link #APP_USERNAME}.
+     * actual user, but is instead generated as random unique {@link UUID}.
      * </p>
      * <p>
      * Service tokens do not expire!
