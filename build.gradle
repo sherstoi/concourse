@@ -158,7 +158,7 @@ subprojects {
                         _version[3] = _version[3].replaceAll("[0-9]+-", "-")
                         _version[3] = _version[3].replaceAll("[0-9]+", "").trim()
                         _version = _version.join(".").replace(".-", "-").replaceAll('\\.$', "")
-                        pom.version = _version
+                        pom.version = _version + '-rc1'
                         pom.project {
                             name mavenTitle
                             description mavenDescription
@@ -210,4 +210,3 @@ subprojects {
         }
     }
 }
-
