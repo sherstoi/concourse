@@ -60,7 +60,7 @@ public class JavaAppTest extends ConcourseBaseTest {
         // @formatter:off
         + "public class GoodSource {"
         + "  public static void main(String... args) {"
-        + "    Systems.out.println(\"" + EXPECTED_OUTPUT + "\");"
+        + "    System.out.println(\"" + EXPECTED_OUTPUT + "\");"
         + "  }" 
         + "}";
         // @formatter:on
