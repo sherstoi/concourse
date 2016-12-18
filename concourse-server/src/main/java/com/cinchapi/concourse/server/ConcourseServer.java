@@ -198,6 +198,13 @@ public class ConcourseServer extends BaseConcourseServer
         // Create an instance of the server and all of its dependencies
         final ConcourseServer server = ConcourseServer.create();
 
+        // Check if concourse is in inconsistent state.
+        if(GlobalState.SYSTEM_ID == null) {
+            throw new IllegalStateException(
+                    "Concourse is in inconsistent state because "
+                            + "the System ID in the buffer and database directories are different");
+        }
+
         // Start the server...
         Thread serverThread = new Thread(new Runnable() {
 
@@ -205,6 +212,7 @@ public class ConcourseServer extends BaseConcourseServer
             public void run() {
                 try {
                     CommandLine.displayWelcomeBanner();
+                    System.out.println("System ID: " + GlobalState.SYSTEM_ID);
                     server.start();
                 }
                 catch (TTransportException e) {
@@ -383,6 +391,7 @@ public class ConcourseServer extends BaseConcourseServer
 
     @Override
     @ThrowsThriftExceptions
+    @PluginRestricted
     public void abort(AccessToken creds, TransactionToken transaction,
             String env) throws TException {
         checkAccess(creds, transaction);
@@ -1135,6 +1144,7 @@ public class ConcourseServer extends BaseConcourseServer
 
     @Override
     @ThrowsThriftExceptions
+    @PluginRestricted
     public boolean commit(AccessToken creds, TransactionToken transaction,
             String env) throws TException {
         checkAccess(creds, transaction);
@@ -3860,6 +3870,7 @@ public class ConcourseServer extends BaseConcourseServer
 
     @Override
     @ThrowsThriftExceptions
+    @PluginRestricted
     public TransactionToken stage(AccessToken creds, String env)
             throws TException {
         checkAccess(creds, null);
