@@ -17,12 +17,14 @@ package com.cinchapi.concourse.server.plugin.io;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.Thread.State;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -200,6 +202,14 @@ public final class SharedMemory {
     private final AtomicBoolean writing = new AtomicBoolean(false);
 
     /**
+     * An {@link Executor} dedicated to detecting and fixing race conditions.
+     */
+    private final ExecutorService raceConditionDetector = Executors
+            .newSingleThreadExecutor(new ThreadFactoryBuilder()
+                    .setNameFormat("shared-memory-race-condition-detector")
+                    .setDaemon(true).build());
+
+    /**
      * Construct a new {@link SharedMemory} instance backed by a temporary
      * store.
      */
@@ -334,6 +344,21 @@ public final class SharedMemory {
             }
         }
         while (nextRead.get() < 0) {
+            Thread parentThread = Thread.currentThread();
+            raceConditionDetector.execute(() -> {
+                // NOTE: There is a subtle race condition that may occur if a
+                // write comes in between the #nextRead check above and when
+                // FileOps#awaitChange registers the #location with the watch
+                // service. To get around that, we have a separate thread check
+                // #nextRead and touch the #location if a write did come in when
+                // the race condition happened.
+                while (parentThread.getState() == State.RUNNABLE) {
+                    continue;
+                }
+                if(nextRead.get() >= 0) {
+                    FileOps.touch(location);
+                }
+            });
             FileOps.awaitChange(location);
         }
         FileLock lock = null;
@@ -588,6 +613,10 @@ public final class SharedMemory {
         try {
             return channel.lock(READ_LOCK_POSITION, 1, false);
         }
+        catch (OverlappingFileLockException e) {
+            Thread.yield();
+            return readLock();
+        }
         catch (IOException e) {
             throw Throwables.propagate(e);
         }
@@ -625,6 +654,10 @@ public final class SharedMemory {
     private FileLock writeLock() {
         try {
             return channel.lock(WRITE_LOCK_POSITION, 1, false);
+        }
+        catch (OverlappingFileLockException e) {
+            Thread.yield();
+            return writeLock();
         }
         catch (IOException e) {
             throw Throwables.propagate(e);

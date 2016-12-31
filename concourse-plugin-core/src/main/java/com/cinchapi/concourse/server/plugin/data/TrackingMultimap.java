@@ -403,6 +403,10 @@ public abstract class TrackingMultimap<K, V> extends AbstractMap<K, Set<V>> {
                                           // type checking
             }
         }
+        Set<V> values = data.get(key);
+        if(values != null && values.isEmpty()){
+            data.remove(key);
+        }
         return stored;
 
     }

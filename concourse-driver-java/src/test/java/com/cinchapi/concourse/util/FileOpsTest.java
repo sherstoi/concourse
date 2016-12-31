@@ -15,7 +15,9 @@
  */
 package com.cinchapi.concourse.util;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,7 +31,33 @@ import com.cinchapi.concourse.test.ConcourseBaseTest;
  */
 public class FileOpsTest extends ConcourseBaseTest {
 
-    @Test
+    @Test(timeout = 10000)
+    public void testAwaitChange() throws InterruptedException {
+        String file = FileOps.tempFile(FileOps.tempDir("con"), "foo", ".test");
+        CountDownLatch latch = new CountDownLatch(1);
+        Thread t = new Thread(() -> {
+            FileOps.awaitChange(file);
+            latch.countDown();
+        });
+        t.start();
+        AtomicBoolean done = new AtomicBoolean(false);
+        Thread t2 = new Thread(() -> {
+            while (!done.get()) {
+                // There is an arbitrary and uncontrollable delay between the
+                // time that the path Thread t starting and the
+                // FileOps#awaitChange method actually registering the path so
+                // we just keep writing to the file so that, eventually, one of
+                // the changes will be caught
+                FileOps.write(Random.getSimpleString(), file);
+            }
+        });
+        t2.start();
+        latch.await();
+        Assert.assertTrue(true);
+        done.set(true);
+    }
+
+    @Test(timeout = 5000)
     public void testAwaitChangeDoesNotRegisterPathMoreThanOnce()
             throws InterruptedException {
         // NOTE: Do not change this test to use a CountDownLatch or some other
@@ -64,9 +92,9 @@ public class FileOpsTest extends ConcourseBaseTest {
         FileOps.write("a", file);
         Assert.assertEquals(1, FileOps.REGISTERED_WATCHER_PATHS.size());
     }
-    
+
     @Test(timeout = 5000)
-    public void testRegisterDifferentPaths(){
+    public void testRegisterDifferentPaths() {
         String file1 = FileOps.tempFile(FileOps.tempDir("con"), null, null);
         String file2 = FileOps.tempFile(FileOps.tempDir("con"), null, null);
         Thread t1 = new Thread(() -> {
@@ -85,6 +113,5 @@ public class FileOpsTest extends ConcourseBaseTest {
         }
         Assert.assertTrue(true);
     }
-
 
 }
