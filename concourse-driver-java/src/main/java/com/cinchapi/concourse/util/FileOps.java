@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 Cinchapi Inc.
+ * Copyright (c) 2013-2017 Cinchapi Inc.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,51 +74,86 @@ public class FileOps {
     /**
      * Cause the current thread to block while waiting for a change to
      * {@code file}.
+     * <p>
+     * Because of limitations of most underlying file systems, this method can
+     * only guarantee changes that occur at least 1 second after this method is
+     * invoked. For changes that occur less than 1 second of method invocation,
+     * the method will return immediately; however, there is a chance that such
+     * a return is indicative of a false positive case where the file changed
+     * before this method was invoked, but within the same second of the
+     * invocation.
+     * </p>
+     * <p>
+     * If protection against that kind of false positive is important, the
+     * caller should check the contents of the underlying file is this method
+     * returns immediately.
+     * </p>
      * 
      * @param file the path to a regular file
      */
     public static void awaitChange(String file) {
+        long methodStartTime = System.currentTimeMillis();
+        methodStartTime = TimeUnit.SECONDS.convert(methodStartTime,
+                TimeUnit.MILLISECONDS);
         Path path = Paths.get(expandPath(file));
         Preconditions.checkArgument(java.nio.file.Files.isRegularFile(path));
-        WatchEvent.Kind<?>[] kinds = { StandardWatchEventKinds.ENTRY_MODIFY };
-        SensitivityWatchEventModifier[] modifiers = {
-                SensitivityWatchEventModifier.HIGH };
-        Watchable parent = path.getParent().toAbsolutePath();
-        if(!REGISTERED_WATCHER_PATHS.contains(parent)) {
-            for (int i = 0; i < FILE_CHANGE_WATCHERS.size(); ++i) {
-                WatchService watcher = FILE_CHANGE_WATCHERS.get(i);
-                try {
-                    if(watcher instanceof PollingWatchService) {
-                        ((PollingWatchService) watcher).register((Path) parent,
-                                kinds, modifiers);
+        String mutex = path.toString().intern();
+        synchronized (mutex) {
+            Watchable parent = path.getParent().toAbsolutePath();
+            if(!REGISTERED_WATCHER_PATHS.contains(parent)) {
+                for (int i = 0; i < FILE_CHANGE_WATCHERS.size(); ++i) {
+                    WatchService watcher = FILE_CHANGE_WATCHERS.get(i);
+                    try {
+                        if(watcher instanceof PollingWatchService) {
+                            ((PollingWatchService) watcher).register(
+                                    (Path) parent, WATCH_EVENT_KINDS,
+                                    WATCH_EVENT_MODIFIERS);
+                        }
+                        else {
+                            parent.register(watcher, WATCH_EVENT_KINDS,
+                                    WATCH_EVENT_MODIFIERS);
+                        }
+                        break;
                     }
-                    else {
-                        parent.register(watcher, kinds, modifiers);
+                    catch (IOException e) {
+                        // If an error occurs while trying to register a
+                        // path with a watch service, cycle through the list
+                        // in order to see if we can find one that will
+                        // accept it.
+                        if(i < FILE_CHANGE_WATCHERS.size()) {
+                            continue;
+                        }
+                        else {
+                            throw CheckedExceptions.throwAsRuntimeException(e);
+                        }
                     }
-                    break;
                 }
-                catch (IOException e) {
-                    // If an error occurs while trying to register a path with a
-                    // watch service, cycle through the list in order to see if
-                    // we can find one that will accept it.
-                    if(i < FILE_CHANGE_WATCHERS.size()) {
-                        continue;
+                REGISTERED_WATCHER_PATHS.add(parent);
+            }
+            try {
+                long modified = java.nio.file.Files.getLastModifiedTime(path)
+                        .toMillis();
+                modified = TimeUnit.SECONDS.convert(modified,
+                        TimeUnit.MILLISECONDS);
+                if(modified >= methodStartTime) {
+                    // A modification occurred after the method start time,
+                    // so return in order to allow the caller to move on
+                    // since the file did indeed change after method
+                    // invocation
+                    return;
+                }
+                else {
+                    try {
+                        mutex.wait();
                     }
-                    else {
-                        throw CheckedExceptions.throwAsRuntimeException(e);
+                    catch (InterruptedException e) {
+                        throw Throwables.propagate(e);
                     }
                 }
             }
-            REGISTERED_WATCHER_PATHS.add(parent);
-        }
-        String sync = path.toString().intern();
-        try {
-            synchronized (sync) {
-                sync.wait();
+            catch (IOException e) {
+                throw CheckedExceptions.throwAsRuntimeException(e);
             }
-        }
-        catch (InterruptedException e) {
-            throw Throwables.propagate(e);
         }
     }
 
@@ -481,6 +516,7 @@ public class FileOps {
             }
 
         });
+        t.setName("watch-service-daemon-" + service.getClass());
         t.setDaemon(true);
         t.start();
     }
@@ -509,13 +545,8 @@ public class FileOps {
                     TimeUnit.MILLISECONDS);
             pollingWatchService.start();
             FILE_CHANGE_WATCHERS.add(pollingWatchService);
-            if(!Platform.isLinux()) {
-                // NOTE: Seems like there are problems when inotify actually
-                // working on Linux, so for now, don't set it as a possible
-                // watch service...
-                FILE_CHANGE_WATCHERS
-                        .add(FileSystems.getDefault().newWatchService());
-            }
+            FILE_CHANGE_WATCHERS
+                    .add(FileSystems.getDefault().newWatchService());
         }
         catch (Exception e) {
             // NOTE: Cannot re-throw the exception because it will prevent the
@@ -540,6 +571,19 @@ public class FileOps {
      * (tilde).
      */
     private static String USER_HOME = System.getProperty("user.home");
+
+    /**
+     * The kind of notifications we care about from the {@link WatchService}s.
+     */
+    private static WatchEvent.Kind<?>[] WATCH_EVENT_KINDS = {
+            StandardWatchEventKinds.ENTRY_MODIFY };
+
+    /**
+     * The modifiers that are supplied when registering a path with one the
+     * {@link WatchService}s.
+     */
+    private static SensitivityWatchEventModifier[] WATCH_EVENT_MODIFIERS = {
+            SensitivityWatchEventModifier.HIGH };
 
     /**
      * The working directory from which the current JVM process was launched.
