@@ -58,6 +58,7 @@ import com.cinchapi.concourse.server.plugin.util.Versions;
 import com.cinchapi.concourse.thrift.AccessToken;
 import com.cinchapi.concourse.thrift.ComplexTObject;
 import com.cinchapi.concourse.thrift.TransactionToken;
+import com.cinchapi.concourse.time.Time;
 import com.cinchapi.concourse.util.ConcurrentMaps;
 import com.cinchapi.concourse.util.Logger;
 import com.cinchapi.concourse.util.MorePaths;
@@ -171,6 +172,23 @@ import static com.cinchapi.concourse.server.GlobalState.BINARY_QUEUE;
 public class PluginManager {
 
     /**
+     * Return the correct temporary directory that should be used to store
+     * temporary files (i.e. shared memory segments, etc) for the
+     * {@code plugin}.
+     * 
+     * @param plugin the fully qualified name of the plugin
+     * @return the temporary directory that should be used for the
+     *         {@code plugin}
+     */
+    private static String getPluginTempDirectory(String plugin) {
+        Path baseTempDir = Paths.get(FileSystem.tempFile()).toFile()
+                .getParentFile().toPath();
+        Path sessionTempDir = baseTempDir.resolve(SESSID);
+        Path pluginTempDir = sessionTempDir.resolve(plugin);
+        return pluginTempDir.toString();
+    }
+
+    /**
      * The number of bytes in a MiB.
      */
     private static final long BYTES_PER_MB = 1048576;
@@ -282,6 +300,12 @@ public class PluginManager {
      * to run the plugin code.
      */
     private String pluginLaunchClassTemplate;
+
+    /**
+     * The session id for the {@link PluginManager}. This is used for grouping
+     * shared memory files.
+     */
+    private final static String SESSID = Long.toString(Time.now());
 
     /**
      * Construct a new instance.
@@ -691,8 +715,9 @@ public class PluginManager {
         String launchClass = plugin.getName();
         String launchClassShort = plugin.getSimpleName();
         String processName = "Concourse_" + launchClassShort;
-        String fromServer = FileSystem.tempFile();
-        String fromPlugin = FileSystem.tempFile();
+        String tempDir = getPluginTempDirectory(launchClass);
+        String fromServer = FileSystem.tempFile(tempDir, "FS-", ".shm");
+        String fromPlugin = FileSystem.tempFile(tempDir, "FP-", ".shm");
         String source = pluginLaunchClassTemplate
                 .replace("INSERT_PROCESS_NAME", processName)
                 .replace("INSERT_IMPORT_STATEMENT", launchClass)
@@ -770,6 +795,19 @@ public class PluginManager {
             }
         });
 
+        // Ensure that the Plugin is ready to run before adding it to the
+        // registry to avoid premature invocations
+        Path readyCheck = com.cinchapi.common.io.Files
+                .getHashedFilePath(serviceToken);
+        try {
+            while (!Files.deleteIfExists(readyCheck)) {
+                Thread.sleep(1000);
+                continue;
+            }
+            Logger.info("Plugin '{}' is ready", plugin);
+        }
+        catch (IOException | InterruptedException e) {}
+
         // Store metadata about the Plugin
         String id = launchClass;
         registry.put(id, RegistryData.PLUGIN_BUNDLE, bundle);
@@ -781,6 +819,10 @@ public class PluginManager {
         registry.put(id, RegistryData.APP_INSTANCE, app);
         registry.put(id, RegistryData.FROM_PLUGIN_RESPONSES,
                 Maps.<AccessToken, RemoteMethodResponse> newConcurrentMap());
+        Logger.debug("Shared memory for server-based communication to '{} is "
+                + "located at '{}", id, fromServer);
+        Logger.debug("Shared memory for plugin-based communication from '{} is "
+                + "located at '{}", id, fromPlugin);
     }
 
     /**
@@ -830,6 +872,13 @@ public class PluginManager {
                                 request);
                         Thread worker = new RemoteInvocationThread(request,
                                 outgoing, server, true, fromPluginResponses);
+                        worker.setUncaughtExceptionHandler(
+                                (thread, throwable) -> {
+                                    Logger.error(
+                                            "While processing request '{}' from '{}', the following "
+                                                    + "non-recoverable error occurred:",
+                                            request, id, throwable);
+                                });
                         worker.start();
                     }
                     else if(message.type() == RemoteMessage.Type.RESPONSE) {
@@ -850,7 +899,7 @@ public class PluginManager {
 
             }
 
-        }, "plugin-event-loop-"+id);
+        }, "plugin-event-loop-" + id);
         loop.setDaemon(true);
         loop.start();
         return loop;
@@ -863,9 +912,12 @@ public class PluginManager {
      * @param id the plugin id
      */
     private void startStreamToPlugin(String id) {
-        String streamFile = FileSystem.tempFile();
+        String tempDir = getPluginTempDirectory(id);
+        String streamFile = FileSystem.tempFile(tempDir, "RT-", ".shm");
         Logger.debug("Creating real-time stream for {} at {}", id, streamFile);
         SharedMemory stream = new SharedMemory(streamFile);
+        Logger.debug("Shared memory for real-time stream of '{} is located at "
+                + "'{}", id, streamFile);
         RemoteAttributeExchange attribute = new RemoteAttributeExchange(
                 "stream", streamFile);
         SharedMemory fromServer = (SharedMemory) registry.get(id,
