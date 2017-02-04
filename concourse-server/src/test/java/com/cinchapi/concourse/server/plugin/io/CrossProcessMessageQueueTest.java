@@ -16,19 +16,19 @@
 package com.cinchapi.concourse.server.plugin.io;
 
 /**
- * Unit tests for {@link SharedMemory} that take advantage of the server's
+ * Unit tests for {@link MessageQueue} that take advantage of the server's
  * ability to fork processes from a local JVM.
  * 
  * @author Jeff Nelson
  */
-public class CrossProcessSharedMemoryTest extends CrossProcessInterProcessCommunicationTest {
+public class CrossProcessMessageQueueTest extends CrossProcessInterProcessCommunicationTest {
 
- 
+
     private static final long serialVersionUID = 1L;
 
     @Override
     public InterProcessCommunication getInterProcessCommunication(String file) {
-        return new SharedMemory(file);
+        return new MessageQueue(file);
     }
 
 }

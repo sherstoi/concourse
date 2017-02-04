@@ -31,8 +31,9 @@ import org.apache.commons.io.output.TeeOutputStream;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.io.Files;
 import com.cinchapi.common.logging.Logger;
+import com.cinchapi.concourse.server.plugin.io.InterProcessCommunication;
+import com.cinchapi.concourse.server.plugin.io.MessageQueue;
 import com.cinchapi.concourse.server.plugin.io.PluginSerializer;
-import com.cinchapi.concourse.server.plugin.io.SharedMemory;
 import com.cinchapi.concourse.thrift.AccessToken;
 import com.cinchapi.concourse.util.ConcurrentMaps;
 import com.google.common.collect.Maps;
@@ -85,7 +86,7 @@ public abstract class Plugin {
     /**
      * The communication channel for messages that come from Concourse Server,
      */
-    protected final SharedMemory fromServer;
+    protected final InterProcessCommunication fromServer;
 
     /**
      * A {@link Logger} for plugin operations.
@@ -108,7 +109,7 @@ public abstract class Plugin {
      * The communication channel for messages that are sent by this
      * {@link Plugin} to Concourse Server.
      */
-    private final SharedMemory fromPlugin;
+    private final InterProcessCommunication fromPlugin;
 
     /**
      * Upstream response from Concourse Server in response to requests made via
@@ -131,8 +132,8 @@ public abstract class Plugin {
      */
     public Plugin(String fromServer, String fromPlugin) {
         this.runtime = ConcourseRuntime.getRuntime();
-        this.fromServer = new SharedMemory(fromServer);
-        this.fromPlugin = new SharedMemory(fromPlugin);
+        this.fromServer = new MessageQueue(fromServer);
+        this.fromPlugin = new MessageQueue(fromPlugin);
         this.fromServerResponses = Maps
                 .<AccessToken, RemoteMethodResponse> newConcurrentMap();
         Path logDir = Paths.get(System.getProperty(PLUGIN_HOME_JVM_PROPERTY)
@@ -260,12 +261,13 @@ public abstract class Plugin {
         private BackgroundInformation() {/* no-op */}
 
         /**
-         * Return the {@link SharedMemory} channel that the Plugin and its
-         * related classes use for outgoing messages to the upstream service.
+         * Return the {@link InterProcessCommunication} channel that the Plugin
+         * and its related classes use for outgoing messages to the upstream
+         * service.
          * 
          * @return the outgoing channel
          */
-        public SharedMemory outgoing() {
+        public InterProcessCommunication outgoing() {
             return fromPlugin;
         }
 
